@@ -6,6 +6,7 @@ require 'net/http'
 require 'net/sftp'
 require 'mime/types'
 require 'openssl'
+require 'netrc'
 
 MIMETypeCommand = "file --mime-type "
 
@@ -79,36 +80,40 @@ class PodcastItem
 		return lines.join("\n") 
 	end
 
-	def constructitemforfileURL(fileurl, username = nil, password = nil)
-		uri = URI(escapexmlurl(fileurl))		
-		uri.user = escapexmlurl(username) if username
-		uri.password = escapexmlurl(password) if password
-
+	def constructitemforfileURI(uri)
 		http = Net::HTTP.new(uri.host, uri.port)
-
 		if uri.scheme == "https"
 			http.use_ssl = true
 			http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 		end
 		
 		request = Net::HTTP::Head.new(uri.request_uri)
-		request.basic_auth(username, password) if username
+		if uri.userinfo
+			request.basic_auth(unescapexmlurl(uri.user), 
+						unescapexmlurl(uri.password)) 
+		end
+
 		response = http.request(request)
 
-		@title = fileurl.split("/")[-1] #this is a bad idea
-		@url = uri 
-		@pubdate = DateTime.httpdate(response["last-modified"]) 
-		@filesize = response["content-length"]
-		@mimetype = response["content-type"] 
+		if response.code == "200"
+			@title = File.basename(uri.path) 
+			@url = uri 
+			@pubdate = DateTime.httpdate(response["last-modified"]) 
+			@filesize = response["content-length"]
+			@mimetype = response["content-type"] 
+		else
+			@title, @url = response.code.to_s, uri
+			@pubdate = DateTime.now
+		end
 		return self
 	end
 
-	def constructitemforfile(localfilepath, httpfolderurl)
-		filename = localfilepath.split(File::SEPARATOR)[-1]
+	def constructitemforfile(localfilepath, uri)
+		filename = File.basename(localfilepath) 
 		escapedpath = Shellwords.escape(localfilepath)
 
 		@title = filename
-		@url = URI.join(httpfolderurl, escapexmlurl(filename))
+		@url = uri.to_s 
 		@filesize = File.size(localfilepath)
 		@mimetype = `#{MIMETypeCommand + escapedpath}`.split(": ")[1].strip
 		@pubdate = DateTime.parse(File.mtime(localfilepath).to_s)
@@ -131,38 +136,76 @@ def xmlbracketize(tagname, content)
 end
 
 def escapexmlurl(url)
-	url = URI.escape(url)
+	url = URI.escape(url.to_s)
 	url = url.gsub("&", "%26").gsub("'", "%27")
 	return url
+end
+
+def unescapexmlurl(url)
+	url = URI.unescape(url)
+	url = url.gsub("%26", "&").gsub("%27", "'")
+	return url
+end
+
+def parseURL(url, netrcfile = nil)
+	uri = URI(escapexmlurl(url))
+	if netrcfile
+		credentials = Netrc.read(netrcfile)[uri.host]
+		uri.user = escapexmlurl(credentials[0])
+		uri.password = escapexmlurl(credentials[1])
+	end
+	return uri
 end
 
 def xmlparamaterize(paramatername, string)
 	return "%s=\"%s\"" % [paramatername, string]
 end
 
-def indexlocaldirectory(localpath, httpfolderurl)
-	items = []
+def indexlocaldirectory(localpath, httpfolderurl, netrcfile = nil)
+	filepaths = []
 	Dir::entries(localpath).each do |entry|
 		filepath = File.join(localpath, entry)
 		if File.ftype(filepath) == "file"
-			items << PodcastItem.new.constructitemforfile(filepath, httpfolderurl)	
+			filepaths << filepath 
 		end
 	end
-	return items
+
+	uris = buildURIsforfiles(filepaths, httpfolderurl, netrcfile)
+
+	items = []
+	filepaths.zip(uris).each do |path, uri|
+		items << PodcastItem.new.constructitemforfile(path, uri)
+	end
+	return items	
 end
 
-def indexremotedirectory(hostname, folderpath, httpfolderurl, username, password)
-	podcastitems = []
+def indexremotedirectory(hostname, remotepath, httpfolderurl, netrcfile = nil)
+	username, password = Netrc.read(netrcfile)[hostname]
+	filepaths = []
 	Net::SFTP.start(hostname, username, :password => password) do |sftp|
-		sftp.dir.entries(folderpath).each do |file|
-			if !file.directory?
-				fileurl = URI.join(httpfolderurl, file.name)
-				podcastitems << PodcastItem.new.constructitemforfileURL(fileurl,
-													 username, password) 
-			end
+		sftp.dir.entries(remotepath).each do |file|
+			filepaths << File.join(remotepath, file.name) unless file.directory?
 		end
 	end
-	return podcastitems
+
+	uris = buildURIsforfiles(filepaths, httpfolderurl, netrcfile)
+
+	items = []
+	uris.each do |uri|
+		items << PodcastItem.new.constructitemforfileURI(uri)
+	end
+
+	return items	
+end
+
+def buildURIsforfiles(filepaths, httpfolderurl, netrcfile = nil)
+	folderURI = parseURL(httpfolderurl, netrcfile)
+	uris	= []
+	filepaths.each do |filepath|
+		escaped = escapexmlurl(File.basename(filepath))
+		uris << URI.join(folderURI, escaped)
+	end
+	return uris 
 end
 
 def parsemedialist()
