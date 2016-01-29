@@ -4,7 +4,6 @@ require 'uri'
 require 'cgi'
 require 'net/http'
 require 'net/sftp'
-require 'mime/types'
 require 'openssl'
 require 'netrc'
 
