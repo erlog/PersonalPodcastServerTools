@@ -108,7 +108,7 @@ class PodcastItem
 		escapedpath = Shellwords.escape(localfilepath)
 
 		@title = filename
-		@url = escapexmlurl(urljoin([httpfolderurl, filename]))
+		@url = URI.join(httpfolderurl, escapexmlurl(filename))
 		@filesize = File.size(localfilepath)
 		@mimetype = `#{MIMETypeCommand + escapedpath}`.split(": ")[1].strip
 		@pubdate = DateTime.parse(File.mtime(localfilepath).to_s)
@@ -140,27 +140,10 @@ def xmlparamaterize(paramatername, string)
 	return "%s=\"%s\"" % [paramatername, string]
 end
 
-def outtomedialist(lines)
-	medialistfile = open(MediaListPath, "w")
-	lines = [lines] if lines.is_a?(String)
-	lines.each do |line|
-		medialistfile << line + "\n"
-	end
-	medialistfile.close()
-end
-
-def pathjoin(elements)
-	return elements.join(File::SEPARATOR)
-end
-
-def urljoin(elements)
-	return elements.join("/")
-end
-
 def indexlocaldirectory(localpath, httpfolderurl)
 	items = []
 	Dir::entries(localpath).each do |entry|
-		filepath = pathjoin([localpath, entry])
+		filepath = File.join(localpath, entry)
 		if File.ftype(filepath) == "file"
 			items << PodcastItem.new.constructitemforfile(filepath, httpfolderurl)	
 		end
@@ -173,7 +156,7 @@ def indexremotedirectory(hostname, folderpath, httpfolderurl, username, password
 	Net::SFTP.start(hostname, username, :password => password) do |sftp|
 		sftp.dir.entries(folderpath).each do |file|
 			if !file.directory?
-				fileurl = urljoin([httpfolderurl, file.name])
+				fileurl = URI.join(httpfolderurl, file.name)
 				podcastitems << PodcastItem.new.constructitemforfileURL(fileurl,
 													 username, password) 
 			end

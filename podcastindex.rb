@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 require_relative 'podcastgeneratorlib'
-require 'uri'
 
 def getfulluri()
 	uri = URI("http://blank.blank")
@@ -14,7 +13,7 @@ rssuri = getfulluri()
 title = rssuri.path
 description = "Index of %s on %s" % [rssuri.path, rssuri.host]
 podcast = Podcast.new(rssuri, title, description)
-localpath = pathjoin([ENV["DOCUMENT_ROOT"], ENV["REQUEST_URI"]])
+localpath = File.join(ENV["DOCUMENT_ROOT"], ENV["REQUEST_URI"])
 
 puts "Content-type: application/xml\n\n"
 podcast.items = indexlocaldirectory(localpath, rssuri)
