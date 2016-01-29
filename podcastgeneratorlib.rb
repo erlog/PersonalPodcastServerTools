@@ -12,7 +12,7 @@ MIMETypeCommand = "file --mime-type "
 class Podcast
 	def initialize(rssurl, title, description)
 		@items = []
-		@rssur = rssurl
+		@rssurl = rssurl
 		@title = title
 		@description = description
 	end
@@ -23,7 +23,7 @@ class Podcast
 		header = ['<?xml version="1.0" encoding="UTF-8"?>']
 		header << '<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">'
 		header << '<channel>'
-		header << "<atom:link href=\"%s\" rel=\"self\" type=\"application/rss+xml\"/>" % RSSURL
+		header << "<atom:link href=\"%s\" rel=\"self\" type=\"application/rss+xml\"/>" % @rssurl 
 		header << xmlbracketize("link", @rssurl)
 		header << xmlbracketize("title", @title)
 		header << xmlbracketize("description", @description)
