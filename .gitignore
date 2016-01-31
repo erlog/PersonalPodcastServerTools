@@ -45,3 +45,7 @@ Session.vim
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Repo-specific files #
+#######################
+.cache
