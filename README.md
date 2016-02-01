@@ -21,7 +21,7 @@ File an issue if you have a feature request, but do know that priority will be g
 ## Security Disclaimer
 This project's goal is to allow access to media files on a server with less hassle. This means that if your server is insecure it will also allow the general public to also access your media server with the same lack of hassle. 
 
-**This project's goal is not to provide a public-facing podcast feed server.** The imagined use case, and my use case, is a **personal** server that has been adequately passworded and firewalled.
+**This project's goal is not to provide a public-facing podcast feed server.** The intended use case is a **personal** server that has been adequately passworded and firewalled.
 
 ## Dependencies
  * [Ruby 2.1.5+](https://www.ruby-lang.org/)
