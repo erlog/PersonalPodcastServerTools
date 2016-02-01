@@ -9,6 +9,7 @@ require 'openssl'
 require 'netrc'
 require 'digest'
 require 'tmpdir'
+require 'rexml/document'
 
 CachePath = File.join(Dir.tmpdir, "podcastgenerator")
 Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
@@ -30,17 +31,17 @@ class Podcast
 		header << '<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">'
 		header << '<channel>'
 		header << "<atom:link href=\"%s\" rel=\"self\" type=\"application/rss+xml\"/>" % @rssurl 
-		header << xmlbracketize("link", @rssurl)
-		header << xmlbracketize("title", @title)
-		header << xmlbracketize("description", @description)
+		header << bracketizeXML("link", @rssurl)
+		header << bracketizeXML("title", @title)
+		header << bracketizeXML("description", @description)
 		return header.join("\n")
 	end
 
-	def getxml()
+	def getXML()
 		itemsxml = [] 
 
 		@items.each do |item|
-			itemsxml << item.getxml
+			itemsxml << item.getXML
 		end
 		return generateheader + itemsxml.join("\n\n") + generatefooter
 	end
@@ -59,8 +60,6 @@ class PodcastItem
 		@pubdate = pubdate #This needs to be a DateTime!
 		@filesize = filesize
 		@mimetype = mimetype
-		@cached = false
-		@cachedxml = nil
 		return self
 	end
 
@@ -74,17 +73,15 @@ class PodcastItem
 		other.pubdate <=> @pubdate
 	end
 	
-	def getxml()
-		return @cachedxml if @cached
-
+	def getXML()
 		lines = ['<item>']
-		lines << xmlbracketize('title', CGI.escapeHTML(@title)) 
-		lines << xmlbracketize('link', @url)
+		lines << bracketizeXML('title', CGI.escapeHTML(@title)) 
+		lines << bracketizeXML('link', @url)
 		lines << "<guid isPermaLink=\"false\">%s</guid>" % @url
-		lines << xmlbracketize('pubDate', @pubdate.httpdate)
-		lines << "<enclosure%s%s%s/>" % [ xmlparamaterize(" url", @url), 
-								xmlparamaterize(" type", @mimetype),
-								xmlparamaterize(" length", @filesize) ] 
+		lines << bracketizeXML('pubDate', @pubdate.httpdate)
+		lines << "<enclosure%s%s%s/>" % [ parameterizeXML(" url", @url), 
+								parameterizeXML(" type", @mimetype),
+								parameterizeXML(" length", @filesize) ] 
 		lines << '</item>'
 		return lines.join("\n") 
 	end
@@ -92,10 +89,9 @@ class PodcastItem
 	def constructitemforfileURI(uri)
 		cached = loadfromcache(uri.to_s)
 		if cached
-			@cached = true
-			@cachedxml = cached
 			puts ["Using cached: ", uri.path].join
-			return self
+			parseditem = constructitemfromXML(cached) 
+			return parseditem unless !parseditem
 		end	
 
 		http = Net::HTTP.new(uri.host, uri.port)
@@ -106,8 +102,8 @@ class PodcastItem
 		
 		request = Net::HTTP::Head.new(uri.request_uri)
 		if uri.userinfo
-			request.basic_auth(unescapexmlurl(uri.user), 
-						unescapexmlurl(uri.password)) 
+			request.basic_auth(unescapeXMLURL(uri.user), 
+						unescapeXMLURL(uri.password)) 
 		end
 
 		response = http.request(request)
@@ -123,7 +119,7 @@ class PodcastItem
 			@pubdate = DateTime.now
 		end
 		
-		savetocache(uri.to_s, getxml)
+		savetocache(uri.to_s, getXML)
 		return self
 	end
 
@@ -138,6 +134,17 @@ class PodcastItem
 		@pubdate = DateTime.parse(File.mtime(localfilepath).to_s)
 		return self
 	end
+
+	def constructitemfromXML(xmlstring)
+		item = REXML::XPath.match(REXML::Document.new(xmlstring), "//item")[0]
+		return item if !item
+		@title = item.elements["title"].text
+		@url = URI(item.elements["link"].text)
+		@pubdate = DateTime.httpdate(item.elements["pubDate"].text) 
+		@filesize = item.elements["enclosure"].attributes["length"]
+		@mimetype = item.elements["enclosure"].attributes["type"]
+		return self
+	end
 end
 
 def syncYouTubePlaylist(url)
@@ -150,33 +157,33 @@ def syncYouTubePlaylist(url)
 	return !system(command)
 end
 
-def xmlbracketize(tagname, content)
+def bracketizeXML(tagname, content)
 	return "<%s>%s</%s>" % [tagname, content, tagname]
 end
 
-def escapexmlurl(url)
+def escapeXMLURL(url)
 	url = URI.escape(url.to_s)
 	url = url.gsub("&", "%26").gsub("'", "%27")
 	return url
 end
 
-def unescapexmlurl(url)
+def unescapeXMLURL(url)
 	url = URI.unescape(url)
 	url = url.gsub("%26", "&").gsub("%27", "'")
 	return url
 end
 
 def parseURL(url, netrcfile = nil)
-	uri = URI(escapexmlurl(url))
+	uri = URI(escapeXMLURL(url))
 	if netrcfile
 		credentials = Netrc.read(netrcfile)[uri.host]
-		uri.user = escapexmlurl(credentials[0])
-		uri.password = escapexmlurl(credentials[1])
+		uri.user = escapeXMLURL(credentials[0])
+		uri.password = escapeXMLURL(credentials[1])
 	end
 	return uri
 end
 
-def xmlparamaterize(paramatername, string)
+def parameterizeXML(paramatername, string)
 	return "%s=\"%s\"" % [paramatername, string]
 end
 
@@ -221,7 +228,7 @@ def buildURIsforfiles(filepaths, httpfolderurl, netrcfile = nil)
 	folderURI = parseURL(httpfolderurl, netrcfile)
 	uris	= []
 	filepaths.each do |filepath|
-		escaped = escapexmlurl(File.basename(filepath))
+		escaped = escapeXMLURL(File.basename(filepath))
 		uris << URI.join(folderURI, escaped)
 	end
 	return uris 
