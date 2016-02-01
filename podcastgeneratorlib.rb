@@ -4,8 +4,14 @@ require 'uri'
 require 'cgi'
 require 'net/http'
 require 'net/sftp'
+require 'mime/types'
 require 'openssl'
 require 'netrc'
+require 'digest'
+require 'tmpdir'
+
+CachePath = File.join(Dir.tmpdir, "podcastgenerator")
+Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
 
 MIMETypeCommand = "file --mime-type "
 
@@ -53,6 +59,8 @@ class PodcastItem
 		@pubdate = pubdate #This needs to be a DateTime!
 		@filesize = filesize
 		@mimetype = mimetype
+		@cached = false
+		@cachedxml = nil
 		return self
 	end
 
@@ -67,6 +75,8 @@ class PodcastItem
 	end
 	
 	def getxml()
+		return @cachedxml if @cached
+
 		lines = ['<item>']
 		lines << xmlbracketize('title', CGI.escapeHTML(@title)) 
 		lines << xmlbracketize('link', @url)
@@ -80,6 +90,14 @@ class PodcastItem
 	end
 
 	def constructitemforfileURI(uri)
+		cached = loadfromcache(uri.to_s)
+		if cached
+			@cached = true
+			@cachedxml = cached
+			puts ["Using cached: ", uri.path].join
+			return self
+		end	
+
 		http = Net::HTTP.new(uri.host, uri.port)
 		if uri.scheme == "https"
 			http.use_ssl = true
@@ -104,6 +122,8 @@ class PodcastItem
 			@title, @url = response.code.to_s, uri
 			@pubdate = DateTime.now
 		end
+		
+		savetocache(uri.to_s, getxml)
 		return self
 	end
 
@@ -214,4 +234,26 @@ def parsemedialist()
 		items << line.split("||", 2)
 	end
 	return items
-end	
+end
+
+def md5(string)
+	md5 = Digest::MD5.new()
+	return md5.update(string).hexdigest
+end
+
+def savetocache(string, data)
+	file = open(File.join(CachePath, md5(string)), "w")
+	file.write(data)
+	file.close()
+end
+
+def loadfromcache(string)
+	file = File.join(CachePath, md5(string))
+	if File.exists?(file)
+		return open(file).read().strip()
+	end
+
+	return nil
+end
+	
+	
