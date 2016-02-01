@@ -249,14 +249,14 @@ def parsemedialist()
 	items = []
 	lines = open(MediaListPath).read.split("\n").map(&:strip)
 	lines.each do |line|
-		items << line.split("||", 2)
+		type, argument = line.split("||", 2)
+		items << [type.downcase, argument]	
 	end
 	return items
 end
 
 def md5(string)
-	md5 = Digest::MD5.new()
-	return md5.update(string).hexdigest
+	return Digest::MD5.new.update(string).hexdigest
 end
 
 def savetocache(string, data)
@@ -267,10 +267,7 @@ end
 
 def loadfromcache(string)
 	file = File.join(CachePath, md5(string))
-	if File.exists?(file)
-		return open(file).read().strip()
-	end
-
+	return open(file).read().strip() if File.exists?(file)
 	return nil
 end
 	

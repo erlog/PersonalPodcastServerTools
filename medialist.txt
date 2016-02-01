@@ -1,0 +1,4 @@
+FileURL||http://www.supremecourt.gov/media/audio/mp3files/14-8913.mp3
+YouTubePlaylistSubscription||https://www.youtube.com/playlist?list=PLdFBN0Nedy2yMBKgkglb1AE_GWdKBNZUn
+RemoteServer||/Public.Domain.Video.Content.Folder/
+YouTubeDL||https://www.youtube.com/watch?v=PaKIZ7gJlRU
