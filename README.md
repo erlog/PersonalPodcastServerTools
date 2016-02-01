@@ -10,7 +10,7 @@ As this is still a new project I have been updating it quite frequently to expan
 File an issue if you have a feature request, but do know that priority will be given to things in my personal life and features I need first. I will try to respond to requests in a timely fashion.
 
 ## Features
- * Sync YouTube channels to a personal podcast feed to avoid using up mobile data with streaming.
+ * Sync YouTube channels to a personal podcast feed to watch offline to avoid using up mobile data with streaming.
  * Download anything [YouTube-DL](https://github.com/rg3/youtube-dl) has support for via URL.
  * Easy access to existing media files by replacing regular directory indexes with per-folder podcast feed indexes.
  * Aggregation of remote server folders without mirroring content on the local server through a mix of SFTP and HTTP calls.
