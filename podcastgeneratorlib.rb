@@ -89,7 +89,6 @@ class PodcastItem
 	def constructitemforfileURI(uri)
 		cached = loadfromcache(uri.to_s)
 		if cached
-			puts ["Using cached: ", uri.path].join
 			parseditem = constructitemfromXML(cached) 
 			return parseditem unless !parseditem
 		end	
@@ -147,14 +146,26 @@ class PodcastItem
 	end
 end
 
-def syncYouTubePlaylist(url)
+def syncYouTubePlaylist(url, downloadfolderpath)
+	downloadfolderpath += "/" unless downloadfolderpath[-1] == "/"
 	command = "youtube-dl "\
 			"--max-downloads 10 "\
 			"--playlist-end 10 "\
 			"--youtube-skip-dash-manifest "\
-			" --date today "\
-			"\"%s\"" % url
-	return !system(command)
+			"--date today "\
+			"-o \"#{downloadfolderpath}%(title)s-%(id)s.%(ext)s\" "\
+			"\"#{url}\""
+	return system(command)
+end
+
+def downloadYouTubeVideo(url, downloadfolderpath, formatcode)
+	command = "youtube-dl "
+	command += "--youtube-skip-dash-manifest "
+	command += "-f #{formatcode} " if formatcode
+	downloadfolderpath += "/" unless downloadfolderpath[-1] == "/"
+	command += "-o #{downloadfolderpath}\"%(title)s-%(id)s.%(ext)s\" "
+	command += "\"#{url}\""
+	return system(command)
 end
 
 def bracketizeXML(tagname, content)

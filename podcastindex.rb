@@ -20,5 +20,5 @@ localpath = File.join(ENV["DOCUMENT_ROOT"], ENV["REQUEST_URI"])
 
 puts "Content-type: application/xml\n\n"
 podcast.items = indexlocaldirectory(localpath, rssuri, NetRCFilePath)
-puts podcast.getxml
+puts podcast.getXML
 
