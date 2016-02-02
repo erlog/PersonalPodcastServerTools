@@ -1,33 +1,23 @@
-require_relative 'podcastgeneratorlib'
-#This is an example file meant for customization
+require_relative '../podcastgeneratorlib'
 
 MediaListPath = "/var/www/html/podcast/medialist.txt"
 MediaFolder = "/var/www/html/podcast/media"
-OutputPath = "/var/www/html/podcast/podcast.xml"
-RSSURL = "https://mediaserver.com/podcast/podcast.xml"
-Title = "Media Server Content Podcast" 
+MediaFolderURL = "https://mediaserver.com/podcast/media"
+RSSFilePath= "/var/www/html/podcast/podcast.xml"
+RSSFileURL = "https://mediaserver.com/podcast/podcast.xml"
+Title = "Media Server Content Podcast"
+Description = "Media list content."
 NetRCFilePath = File.expand_path("~/.netrc")
+RemoteServerSettings = {
+	"myremote" => ["remoteserver.com", "https://remoteserver.com/files"] }
 
-podcast = Podcast.new(RSSURL, Title, Title)
 
-parsemedialist().each do |type, argument|
-	case type 
-		when "fileurl" 
-			uri = parseURL(argument)
-			podcast.items << PodcastItem.new.constructitemforfileURI(uri)	
-		when "youtubeplaylistsubscription"
-			syncYouTubePlaylist(argument, MediaFolder)
-		when "remoteserver"
-			folderurl = ["https://remoteserver.com/files", argument].join("/") 
-			folderpath = argument 
-			hostname = "remoteserver.com" 
-			podcast.items += indexremotedirectory(hostname, folderpath,
-								folderurl, NetRCFilePath)
-		when "youtubedl"
-			downloadYouTubeVideo(argument, MediaFolder, 22)
-	end
-end
-
+podcast = Podcast.new(RSSFileURL, Title, Description)
+podcast.items = handle_media_list(MediaListPath,
+							MediaFolder,
+							MediaFolderURL,
+							RemoteServerSettings,
+							NetRCFilePath)
 podcast.items.sort_by!(&:title)
-open(OutputPath, "w").write(podcast.getXML)
+open(RSSFilePath, "w").write(podcast.get_xml)
 

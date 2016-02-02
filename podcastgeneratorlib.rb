@@ -23,14 +23,14 @@ class Podcast
 		@title = title
 		@description = description
 	end
-	
+
 	attr_accessor :items
 
 	def generate_header()
 		header = ['<?xml version="1.0" encoding="UTF-8"?>']
 		header << '<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">'
 		header << '<channel>'
-		header << "<atom:link href=\"%s\" rel=\"self\" type=\"application/rss+xml\"/>" % @rss_url 
+		header << "<atom:link href=\"%s\" rel=\"self\" type=\"application/rss+xml\"/>" % @rss_url
 		header << bracketize_xml("link", @rss_url)
 		header << bracketize_xml("title", @title)
 		header << bracketize_xml("description", @description)
@@ -38,7 +38,7 @@ class Podcast
 	end
 
 	def get_xml()
-		itemsxml = [] 
+		itemsxml = []
 
 		@items.each do |item|
 			itemsxml << item.get_xml
@@ -72,62 +72,62 @@ class PodcastItem
 	def <=>(other)
 		other.pubdate <=> @pubdate
 	end
-	
+
 	def get_xml()
 		lines = ['<item>']
-		lines << bracketize_xml('title', CGI.escapeHTML(@title)) 
+		lines << bracketize_xml('title', CGI.escapeHTML(@title))
 		lines << bracketize_xml('link', @url)
 		lines << "<guid isPermaLink=\"false\">%s</guid>" % @url
 		lines << bracketize_xml('pubDate', @pubdate.httpdate)
-		lines << "<enclosure%s%s%s/>" % [ parameterize_xml(" url", @url), 
+		lines << "<enclosure%s%s%s/>" % [ parameterize_xml(" url", @url),
 								parameterize_xml(" type", @mimetype),
-								parameterize_xml(" length", @filesize) ] 
+								parameterize_xml(" length", @filesize) ]
 		lines << '</item>'
-		return lines.join("\n") 
+		return lines.join("\n")
 	end
 
 	def construct_item_for_file_uri(uri)
 		cached = load_from_cache(uri.to_s)
 		if cached
-			parseditem = construct_item_from_xml(cached) 
+			parseditem = construct_item_from_xml(cached)
 			return parseditem unless !parseditem
-		end	
+		end
 
 		http = Net::HTTP.new(uri.host, uri.port)
 		if uri.scheme == "https"
 			http.use_ssl = true
 			http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 		end
-		
+
 		request = Net::HTTP::Head.new(uri.request_uri)
 		if uri.userinfo
-			request.basic_auth(unescape_xml_url(uri.user), 
-						unescape_xml_url(uri.password)) 
+			request.basic_auth(unescape_xml_url(uri.user),
+						unescape_xml_url(uri.password))
 		end
 
 		response = http.request(request)
 
 		if response.code == "200"
-			@title = File.basename(uri.path) 
-			@url = uri 
-			@pubdate = DateTime.httpdate(response["last-modified"]) 
+			@title = File.basename(uri.path)
+			@url = uri
+			@pubdate = DateTime.httpdate(response["last-modified"])
 			@filesize = response["content-length"]
-			@mimetype = response["content-type"] 
+			@mimetype = response["content-type"]
 		else
 			@title, @url = response.code.to_s, uri
 			@pubdate = DateTime.now
 		end
-		
+
 		save_to_cache(uri.to_s, get_xml)
 		return self
 	end
 
 	def construct_item_for_file(localfilepath, uri)
-		filename = File.basename(localfilepath) 
+		filename = File.basename(localfilepath)
 		escapedpath = Shellwords.escape(localfilepath)
 
 		@title = filename
-		@url = uri.to_s 
+		@url = uri.to_s
 		@filesize = File.size(localfilepath)
 		@mimetype = `#{MIMETypeCommand + escapedpath}`.split(": ")[1].strip
 		@pubdate = DateTime.parse(File.mtime(localfilepath).to_s)
@@ -139,7 +139,7 @@ class PodcastItem
 		return item if !item
 		@title = item.elements["title"].text
 		@url = URI(item.elements["link"].text)
-		@pubdate = DateTime.httpdate(item.elements["pubDate"].text) 
+		@pubdate = DateTime.httpdate(item.elements["pubDate"].text)
 		@filesize = item.elements["enclosure"].attributes["length"]
 		@mimetype = item.elements["enclosure"].attributes["type"]
 		return self
@@ -204,7 +204,7 @@ def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
 	Dir::entries(localpath).each do |entry|
 		filepath = File.join(localpath, entry)
 		if File.ftype(filepath) == "file"
-			filepaths << filepath 
+			filepaths << filepath
 		end
 	end
 
@@ -214,7 +214,7 @@ def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
 	filepaths.zip(uris).each do |path, uri|
 		items << PodcastItem.new.construct_item_for_file(path, uri)
 	end
-	return items	
+	return items
 end
 
 def index_remote_directory(hostname, remotepath, httpfolderurl, netrcfile = nil)
@@ -233,7 +233,7 @@ def index_remote_directory(hostname, remotepath, httpfolderurl, netrcfile = nil)
 		items << PodcastItem.new.construct_item_for_file_uri(uri)
 	end
 
-	return items	
+	return items
 end
 
 def build_uris_for_files(filepaths, httpfolderurl, netrcfile = nil)
@@ -243,7 +243,7 @@ def build_uris_for_files(filepaths, httpfolderurl, netrcfile = nil)
 		escaped = escape_xml_url(File.basename(filepath))
 		uris << URI.join(folderURI, escaped)
 	end
-	return uris 
+	return uris
 end
 
 def parse_media_list(media_list_path)
@@ -251,12 +251,45 @@ def parse_media_list(media_list_path)
 	lines = open(media_list_path).read.split("\n").map(&:strip)
 	lines.each do |line|
 		split = line.split("||")
-		type = split.slice!(0) 
-		path = split.slice!(-1) 
-		arguments = split 
-		items << [type.downcase, arguments, path]	
+		type = split.slice!(0)
+		path = split.slice!(-1)
+		arguments = split
+		items << [type.downcase, arguments, path]
 	end
-	print items
+	return items
+end
+
+#an example use case for this is in aggregator.rb in the example_scripts folder
+def handle_media_list(media_list_path, media_folder, media_folder_url,
+								server_settings, netrc_file_path)
+	items = []
+	parse_media_list(media_list_path).each do |type, arguments, path|
+		case type
+		when "fileurl"
+			uri = parse_url(path)
+			items << PodcastItem.new.construct_item_for_file_uri(uri)
+
+		when "youtubeplaylistsubscription"
+			format, url = arguments[0], path
+			sync_youtube_playlist(url, media_folder, format)
+
+		when "youtubedl"
+			format, url = arguments[0], path
+			download_youtube_video(url, media_folder, format)
+
+		when "remoteserver"
+			settings = server_settings[arguments[0].downcase]
+			folder_url = [settings[1], path].join("/")
+			hostname = settings[0]
+			items += index_remote_directory(hostname, path,
+								folder_url, netrc_file_path)
+		else
+			puts "No handler for #{type}"
+		end
+	end
+
+	items += index_local_directory(media_folder, media_folder_url,
+												netrc_file_path)
 	return items
 end
 
@@ -275,5 +308,5 @@ def load_from_cache(string)
 	return open(file).read().strip() if File.exists?(file)
 	return nil
 end
-	
-	
+
+
