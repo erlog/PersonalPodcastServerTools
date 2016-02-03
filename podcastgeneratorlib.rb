@@ -10,44 +10,36 @@ require 'netrc'
 require 'digest'
 require 'tmpdir'
 require 'rexml/document'
+require 'rss'
 
 CachePath = File.join(Dir.tmpdir, "podcastgenerator")
 Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
-
+RSSType = "2.0"
 MIMETypeCommand = "file --mime-type "
 
 class Podcast
 	def initialize(rssurl, title, description)
-		@items = []
-		@rss_url = rssurl
 		@title = title
 		@description = description
+		@rss_url = rssurl
+		@items = []
 	end
 
 	attr_accessor :items
 
-	def generate_header()
-		header = ['<?xml version="1.0" encoding="UTF-8"?>']
-		header << '<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">'
-		header << '<channel>'
-		header << "<atom:link href=\"%s\" rel=\"self\" type=\"application/rss+xml\"/>" % @rss_url
-		header << bracketize_xml("link", @rss_url)
-		header << bracketize_xml("title", @title)
-		header << bracketize_xml("description", @description)
-		return header.join("\n")
-	end
-
 	def get_xml()
-		itemsxml = []
+		rss = RSS::Rss.new("2.0")
+		rss.channel  = RSS::Rss::Channel.new
 
-		@items.each do |item|
-			itemsxml << item.get_xml
+		rss.channel.title = @title
+		rss.channel.link = @rss_url
+		rss.channel.description = @description
+
+		items.each do |item|
+			rss.channel.items << item.get_rss_item
 		end
-		return generate_header + itemsxml.join("\n\n") + generate_footer
-	end
 
-	def generate_footer()
-		return ['</channel>', '</rss>'].join("\n")
+		return rss
 	end
 end
 
@@ -73,17 +65,21 @@ class PodcastItem
 		other.pubdate <=> @pubdate
 	end
 
-	def get_xml()
-		lines = ['<item>']
-		lines << bracketize_xml('title', CGI.escapeHTML(@title))
-		lines << bracketize_xml('link', @url)
-		lines << "<guid isPermaLink=\"false\">%s</guid>" % @url
-		lines << bracketize_xml('pubDate', @pubdate.httpdate)
-		lines << "<enclosure%s%s%s/>" % [ parameterize_xml(" url", @url),
-								parameterize_xml(" type", @mimetype),
-								parameterize_xml(" length", @filesize) ]
-		lines << '</item>'
-		return lines.join("\n")
+	def get_rss_item()
+		item = RSS::Rss::Channel::Item.new
+		item.guid = RSS::Rss::Channel::Item::Guid.new
+		item.enclosure= RSS::Rss::Channel::Item::Enclosure.new
+
+		item.title = @title
+		item.link = @url
+		item.guid.content = @url
+		item.guid.isPermaLink = false
+		item.pubDate = @pubdate.httpdate
+		item.enclosure.length = @filesize
+		item.enclosure.url = @url
+		item.enclosure.type = @mimetype
+
+		return item
 	end
 
 	def construct_item_for_file_uri(uri)
@@ -169,19 +165,13 @@ def download_youtube_video(url, downloadfolderpath, formatcode)
 	return system(command)
 end
 
-def bracketize_xml(tagname, content)
-	return "<%s>%s</%s>" % [tagname, content, tagname]
-end
-
 def escape_xml_url(url)
 	url = URI.escape(url.to_s)
-	url = url.gsub("&", "%26").gsub("'", "%27")
 	return url
 end
 
 def unescape_xml_url(url)
 	url = URI.unescape(url)
-	url = url.gsub("%26", "&").gsub("%27", "'")
 	return url
 end
 
@@ -193,10 +183,6 @@ def parse_url(url, netrcfile = nil)
 		uri.password = escape_xml_url(credentials[1])
 	end
 	return uri
-end
-
-def parameterize_xml(paramatername, string)
-	return "%s=\"%s\"" % [paramatername, string]
 end
 
 def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
@@ -269,7 +255,7 @@ def handle_media_list(media_list_path, media_folder, media_folder_url,
 			uri = parse_url(path)
 			items << PodcastItem.new.construct_item_for_file_uri(uri)
 
-		when "youtubeplaylistsubscription"
+		when "xyoutubeplaylistsubscription"
 			format, url = arguments[0], path
 			sync_youtube_playlist(url, media_folder, format)
 
@@ -308,5 +294,3 @@ def load_from_cache(string)
 	return open(file).read().strip() if File.exists?(file)
 	return nil
 end
-
-
