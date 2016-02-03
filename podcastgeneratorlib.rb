@@ -4,7 +4,6 @@ require 'uri'
 require 'cgi'
 require 'net/http'
 require 'net/sftp'
-require 'mime/types'
 require 'openssl'
 require 'netrc'
 require 'digest'
@@ -14,7 +13,7 @@ require 'rss'
 require 'fileutils'
 
 #Initialize cache
-CachePath = File.join(Dir.tmpdir, "podcastgenerator")
+CachePath = File.join(Dir.tmpdir, "podcastgenerator-#{ENV["USER"]}")
 Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
 
 class Podcast
@@ -44,13 +43,11 @@ class Podcast
 		item.enclosure= RSS::Rss::Channel::Item::Enclosure.new
 
 		item.title = title
-		item.link = url
-		item.guid.content = url
-		item.guid.isPermaLink = false
 		item.pubDate = pubdate.httpdate
 		item.enclosure.length = filesize
-		item.enclosure.url = url
 		item.enclosure.type = mimetype
+		item.guid.isPermaLink = false
+		item.link, item.guid.content, item.enclosure.url = url, url, url
         return item
 	end
 
@@ -74,26 +71,20 @@ class Podcast
 
 		request = Net::HTTP::Head.new(uri.request_uri)
 		if uri.userinfo
-			request.basic_auth(unescape_xml_url(uri.user),
-						unescape_xml_url(uri.password))
+			request.basic_auth(URI.unescape(uri.user), URI.unescape(uri.password))
 		end
 
 		response = http.request(request)
 
 		if response.code == "200"
 			title = File.basename(uri.path)
-			url = uri
 			pubdate = DateTime.httpdate(response["last-modified"])
 			filesize = response["content-length"]
 			mimetype = response["content-type"]
-            item = new_item(title, url, pubdate, filesize, mimetype)
+            item = new_item(title, uri, pubdate, filesize, mimetype)
 			save_to_cache(uri.to_s, item)
 		else
-			title, url = response.code.to_s, uri
-			pubdate = DateTime.now
-			filesize = 0
-			mimetype = ""
-            item = new_item(title, url, pubdate, filesize, mimetype)
+            item = new_item(response.code, uri, DateTime.now.httpdate , 0, "")
 		end
 
 	   return item
@@ -133,22 +124,12 @@ def download_youtube_video(url, downloadfolderpath, formatcode)
 	return system(command)
 end
 
-def escape_xml_url(url)
-	url = URI.escape(url.to_s)
-	return url
-end
-
-def unescape_xml_url(url)
-	url = URI.unescape(url)
-	return url
-end
-
 def parse_url(url, netrcfile = nil)
-	uri = URI(escape_xml_url(url))
+	uri = URI(URI.escape(url))
 	if netrcfile
 		credentials = Netrc.read(netrcfile)[uri.host]
-		uri.user = escape_xml_url(credentials[0])
-		uri.password = escape_xml_url(credentials[1])
+		uri.user = URI.escape(credentials[0])
+		uri.password = URI.escape(credentials[1])
 	end
 	return uri
 end
@@ -196,7 +177,7 @@ def build_uris_for_files(filepaths, httpfolderurl, netrcfile = nil)
 	folderURI = parse_url(httpfolderurl, netrcfile)
 	uris	= []
 	filepaths.each do |filepath|
-		escaped = escape_xml_url(File.basename(filepath))
+		escaped = URI.escape(File.basename(filepath))
 		uris << URI.join(folderURI, escaped)
 	end
 	return uris
