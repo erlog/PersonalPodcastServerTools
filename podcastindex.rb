@@ -19,8 +19,8 @@ local_path = File.join(ENV["DOCUMENT_ROOT"], ENV["REQUEST_URI"])
 
 podcast = Podcast.new(rss_uri, title, description)
 podcast.items = index_local_directory(local_path, rss_uri, NetRCFilePath)
-podcast.items.sort_by!(&:pubdate).reverse!
+podcast.items.sort_by!(&:pubDate).reverse!
 
 puts "Content-type: application/xml\n\n"
-puts podcast.get_xml
+puts podcast.to_s
 

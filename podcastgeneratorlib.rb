@@ -11,80 +11,58 @@ require 'digest'
 require 'tmpdir'
 require 'rexml/document'
 require 'rss'
+require 'fileutils'
 
 #Initialize cache
 CachePath = File.join(Dir.tmpdir, "podcastgenerator")
 Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
 
 class Podcast
-	def initialize(rssurl, title, description)
-		@title = title
-		@description = description
-		@rss_url = rssurl
-		@items = []
+	def initialize(rss_url, title, description)
+		@rss = RSS::Rss.new("2.0")
+		@rss.channel = RSS::Rss::Channel.new
+		@rss.channel.title = title
+		@rss.channel.link = rss_url
+		@rss.channel.description = description
+        @items = []
 	end
 
-	attr_accessor :items
+    attr_accessor :items
 
-	def get_xml()
-		rss = RSS::Rss.new("2.0")
-		rss.channel  = RSS::Rss::Channel.new
-
-		rss.channel.title = @title
-		rss.channel.link = @rss_url
-		rss.channel.description = @description
-
-		items.each do |item|
-			rss.channel.items << item.get_rss_item
-		end
-
-		return rss
-	end
-end
-
-class PodcastItem
-	include Comparable
-
-	def initialize(title = nil, url = nil, pubdate = nil, filesize = nil, mimetype = nil)
-		@title = title
-		@url = url
-		@pubdate = pubdate #This needs to be a DateTime!
-		@filesize = filesize
-		@mimetype = mimetype
-		return self
+	def to_s()
+        #for some reason we can't set the items list directly in the channel
+        #  so the only way to maintain abstraction is to add the items to an
+        #  empty clone of our channel and then discard it
+        clone = @rss.dup
+        items.each do |item| clone.channel.items << item end
+		return clone.to_s
 	end
 
-	attr_reader :title
-	attr_reader :url
-	attr_reader :pubdate
-	attr_reader :filesize
-	attr_reader :mimetype
-
-	def <=>(other)
-		other.pubdate <=> @pubdate
-	end
-
-	def get_rss_item()
+	def self.new_item(title, url, pubdate, filesize, mimetype)
 		item = RSS::Rss::Channel::Item.new
 		item.guid = RSS::Rss::Channel::Item::Guid.new
 		item.enclosure= RSS::Rss::Channel::Item::Enclosure.new
 
-		item.title = @title
-		item.link = @url
-		item.guid.content = @url
+		item.title = title
+		item.link = url
+		item.guid.content = url
 		item.guid.isPermaLink = false
-		item.pubDate = @pubdate.httpdate
-		item.enclosure.length = @filesize
-		item.enclosure.url = @url
-		item.enclosure.type = @mimetype
-
-		return item
+		item.pubDate = pubdate.httpdate
+		item.enclosure.length = filesize
+		item.enclosure.url = url
+		item.enclosure.type = mimetype
+        return item
 	end
 
-	def construct_item_from_uri(uri)
+	def self.construct_item_from_uri(uri)
 		cached = load_from_cache(uri.to_s)
 		if cached
-			parseditem = construct_item_from_xml(cached)
+            begin
+                parseditem = construct_item_from_xml(cached)
+            rescue ArgumentError
+                parseditem = nil
+            end
+
 			return parseditem unless !parseditem
 		end
 
@@ -103,30 +81,32 @@ class PodcastItem
 		response = http.request(request)
 
 		if response.code == "200"
-			@title = File.basename(uri.path)
-			@url = uri
-			@pubdate = DateTime.httpdate(response["last-modified"])
-			@filesize = response["content-length"]
-			@mimetype = response["content-type"]
-
-			save_to_cache(uri.to_s, get_rss_item)
+			title = File.basename(uri.path)
+			url = uri
+			pubdate = DateTime.httpdate(response["last-modified"])
+			filesize = response["content-length"]
+			mimetype = response["content-type"]
+            item = new_item(title, url, pubdate, filesize, mimetype)
+			save_to_cache(uri.to_s, item)
 		else
-			@title, @url = response.code.to_s, uri
-			@pubdate = DateTime.now
+			title, url = response.code.to_s, uri
+			pubdate = DateTime.now
+			filesize = 0
+			mimetype = ""
+            item = new_item(title, url, pubdate, filesize, mimetype)
 		end
 
-		return self
+	   return item
 	end
 
-	def construct_item_from_xml(xmlstring)
-		item = REXML::XPath.match(REXML::Document.new(xmlstring), "//item")[0]
-		return item if !item
-		@title = item.elements["title"].text
-		@url = URI(item.elements["link"].text)
-		@pubdate = DateTime.httpdate(item.elements["pubDate"].text)
-		@filesize = item.elements["enclosure"].attributes["length"]
-		@mimetype = item.elements["enclosure"].attributes["type"]
-		return self
+	def self.construct_item_from_xml(xmlstring)
+        item = REXML::XPath.match(REXML::Document.new(xmlstring), "//item")[0]
+        title = item.elements["title"].text
+        url = URI(item.elements["link"].text)
+        pubdate = DateTime.httpdate(item.elements["pubDate"].text)
+        filesize = item.elements["enclosure"].attributes["length"]
+        mimetype = item.elements["enclosure"].attributes["type"]
+        return new_item(title, url, pubdate, filesize, mimetype)
 	end
 end
 
@@ -175,6 +155,7 @@ end
 
 def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
 	filepaths = []
+
 	Dir::entries(localpath).each do |entry|
 		filepath = File.join(localpath, entry)
 		if File.ftype(filepath) == "file"
@@ -186,7 +167,7 @@ def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
 
 	items = []
 	uris.each do |uri|
-		items << PodcastItem.new.construct_item_from_uri(uri)
+		items << Podcast.construct_item_from_uri(uri)
 	end
 
 	return items
@@ -205,7 +186,7 @@ def index_remote_directory(hostname, remotepath, httpfolderurl, netrcfile = nil)
 
 	items = []
 	uris.each do |uri|
-		items << PodcastItem.new.construct_item_from_uri(uri)
+		items << Podcast.construct_item_from_uri(uri)
 	end
 
 	return items
@@ -242,7 +223,7 @@ def handle_media_list(media_list_path, media_folder, media_folder_url,
 		case type
 		when "fileurl"
 			uri = parse_url(path)
-			items << PodcastItem.new.construct_item_from_uri(uri)
+			items << Podcast.construct_item_from_uri(uri)
 
 		when "youtubeplaylistsubscription"
 			format, url = arguments[0], path
