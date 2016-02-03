@@ -12,10 +12,9 @@ require 'tmpdir'
 require 'rexml/document'
 require 'rss'
 
+#Initialize cache
 CachePath = File.join(Dir.tmpdir, "podcastgenerator")
 Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
-RSSType = "2.0"
-MIMETypeCommand = "file --mime-type "
 
 class Podcast
 	def initialize(rssurl, title, description)
@@ -120,12 +119,11 @@ class PodcastItem
 
 	def construct_item_for_file(localfilepath, uri)
 		filename = File.basename(localfilepath)
-		escapedpath = Shellwords.escape(localfilepath)
 
 		@title = filename
 		@url = uri.to_s
 		@filesize = File.size(localfilepath)
-		@mimetype = `#{MIMETypeCommand + escapedpath}`.split(": ")[1].strip
+		@mimetype = get_mime_type(localfilepath)
 		@pubdate = DateTime.parse(File.mtime(localfilepath).to_s)
 		return self
 	end
@@ -173,6 +171,12 @@ end
 def unescape_xml_url(url)
 	url = URI.unescape(url)
 	return url
+end
+
+def get_mime_type(path)
+	path = Shellwords.escape(path)
+	command = "file --mime-type "
+	return `#{command + path}`.split(": ")[1].strip
 end
 
 def parse_url(url, netrcfile = nil)
@@ -255,7 +259,7 @@ def handle_media_list(media_list_path, media_folder, media_folder_url,
 			uri = parse_url(path)
 			items << PodcastItem.new.construct_item_for_file_uri(uri)
 
-		when "xyoutubeplaylistsubscription"
+		when "youtubeplaylistsubscription"
 			format, url = arguments[0], path
 			sync_youtube_playlist(url, media_folder, format)
 
