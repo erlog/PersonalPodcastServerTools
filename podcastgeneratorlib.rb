@@ -81,7 +81,7 @@ class PodcastItem
 		return item
 	end
 
-	def construct_item_for_file_uri(uri)
+	def construct_item_from_uri(uri)
 		cached = load_from_cache(uri.to_s)
 		if cached
 			parseditem = construct_item_from_xml(cached)
@@ -108,23 +108,13 @@ class PodcastItem
 			@pubdate = DateTime.httpdate(response["last-modified"])
 			@filesize = response["content-length"]
 			@mimetype = response["content-type"]
+
+			save_to_cache(uri.to_s, get_rss_item)
 		else
 			@title, @url = response.code.to_s, uri
 			@pubdate = DateTime.now
 		end
 
-		save_to_cache(uri.to_s, get_xml)
-		return self
-	end
-
-	def construct_item_for_file(localfilepath, uri)
-		filename = File.basename(localfilepath)
-
-		@title = filename
-		@url = uri.to_s
-		@filesize = File.size(localfilepath)
-		@mimetype = get_mime_type(localfilepath)
-		@pubdate = DateTime.parse(File.mtime(localfilepath).to_s)
 		return self
 	end
 
@@ -173,12 +163,6 @@ def unescape_xml_url(url)
 	return url
 end
 
-def get_mime_type(path)
-	path = Shellwords.escape(path)
-	command = "file --mime-type "
-	return `#{command + path}`.split(": ")[1].strip
-end
-
 def parse_url(url, netrcfile = nil)
 	uri = URI(escape_xml_url(url))
 	if netrcfile
@@ -201,9 +185,10 @@ def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
 	uris = build_uris_for_files(filepaths, httpfolderurl, netrcfile)
 
 	items = []
-	filepaths.zip(uris).each do |path, uri|
-		items << PodcastItem.new.construct_item_for_file(path, uri)
+	uris.each do |uri|
+		items << PodcastItem.new.construct_item_from_uri(uri)
 	end
+
 	return items
 end
 
@@ -220,7 +205,7 @@ def index_remote_directory(hostname, remotepath, httpfolderurl, netrcfile = nil)
 
 	items = []
 	uris.each do |uri|
-		items << PodcastItem.new.construct_item_for_file_uri(uri)
+		items << PodcastItem.new.construct_item_from_uri(uri)
 	end
 
 	return items
@@ -257,7 +242,7 @@ def handle_media_list(media_list_path, media_folder, media_folder_url,
 		case type
 		when "fileurl"
 			uri = parse_url(path)
-			items << PodcastItem.new.construct_item_for_file_uri(uri)
+			items << PodcastItem.new.construct_item_from_uri(uri)
 
 		when "youtubeplaylistsubscription"
 			format, url = arguments[0], path
