@@ -43,7 +43,7 @@ class Podcast
 		item.enclosure= RSS::Rss::Channel::Item::Enclosure.new
 
 		item.title = title
-		item.pubDate = pubdate.httpdate
+		item.pubDate = pubdate
 		item.enclosure.length = filesize
 		item.enclosure.type = mimetype
 		item.guid.isPermaLink = false
@@ -56,7 +56,7 @@ class Podcast
 		if cached
             begin
                 parseditem = construct_item_from_xml(cached)
-            rescue ArgumentError
+            rescue
                 parseditem = nil
             end
 
@@ -77,8 +77,8 @@ class Podcast
 		response = http.request(request)
 
 		if response.code == "200"
-			title = File.basename(uri.path)
-			pubdate = DateTime.httpdate(response["last-modified"])
+			title = URI.unescape(File.basename(uri.path))
+			pubdate = response["last-modified"]
 			filesize = response["content-length"]
 			mimetype = response["content-type"]
             item = new_item(title, uri, pubdate, filesize, mimetype)
@@ -94,7 +94,7 @@ class Podcast
         item = REXML::XPath.match(REXML::Document.new(xmlstring), "//item")[0]
         title = item.elements["title"].text
         url = URI(item.elements["link"].text)
-        pubdate = DateTime.httpdate(item.elements["pubDate"].text)
+        pubdate = item.elements["pubDate"].text
         filesize = item.elements["enclosure"].attributes["length"]
         mimetype = item.elements["enclosure"].attributes["type"]
         return new_item(title, url, pubdate, filesize, mimetype)
@@ -174,6 +174,7 @@ def index_remote_directory(hostname, remotepath, httpfolderurl, netrcfile = nil)
 end
 
 def build_uris_for_files(filepaths, httpfolderurl, netrcfile = nil)
+    httpfolderurl += "/" unless httpfolderurl[-1] == "/"
 	folderURI = parse_url(httpfolderurl, netrcfile)
 	uris	= []
 	filepaths.each do |filepath|
