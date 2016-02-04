@@ -26,6 +26,7 @@ This project's goal is to allow access to media files on a server with less hass
 ## Dependencies
  * [Ruby 2.1.5+](https://www.ruby-lang.org/)
  * [netrc Ruby gem](https://rubygems.org/gems/netrc/)
+ * [net-sftp Ruby gem](https://rubygems.org/gems/net-sftp/)
  * [YouTube-DL](https://github.com/rg3/youtube-dl)
  * Any web server that can serve files. 
  * The directory index script requires CGI to be configured on the web server.
