@@ -37,6 +37,10 @@ class Podcast
 		return clone.to_s
 	end
 
+    def write(filepath)
+        open(filepath, "w").write(to_s)
+    end
+
 	def self.new_item(title, url, pubdate, filesize, mimetype)
 		item = RSS::Rss::Channel::Item.new
 		item.guid = RSS::Rss::Channel::Item::Guid.new
@@ -101,135 +105,6 @@ class Podcast
 	end
 end
 
-def sync_youtube_playlist(url, downloadfolderpath, formatcode)
-	downloadfolderpath += "/" unless downloadfolderpath[-1] == "/"
-	command = "youtube-dl "
-	command += "--max-downloads 10 "
-	command += "--playlist-end 10 "
-	command += "--youtube-skip-dash-manifest "
-	command += "-f #{formatcode} " if formatcode
-	command += "--dateafter today-2days "
-	command += "-o \"#{downloadfolderpath}%(title)s-%(id)s.%(ext)s\" "
-	command += "\"#{url}\""
-	return system(command)
-end
-
-def download_youtube_video(url, downloadfolderpath, formatcode)
-	downloadfolderpath += "/" unless downloadfolderpath[-1] == "/"
-	command = "youtube-dl "
-	command += "--youtube-skip-dash-manifest "
-	command += "-f #{formatcode} " if formatcode
-	command += "-o #{downloadfolderpath}\"%(title)s-%(id)s.%(ext)s\" "
-	command += "\"#{url}\""
-	return system(command)
-end
-
-def parse_url(url, netrcfile = nil)
-	uri = URI(URI.escape(url))
-	if netrcfile
-		credentials = Netrc.read(netrcfile)[uri.host]
-		uri.user = URI.escape(credentials[0])
-		uri.password = URI.escape(credentials[1])
-	end
-	return uri
-end
-
-def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
-	filepaths = []
-
-	Dir::entries(localpath).each do |entry|
-		filepath = File.join(localpath, entry)
-		if File.ftype(filepath) == "file"
-			filepaths << filepath
-		end
-	end
-
-	uris = build_uris_for_files(filepaths, httpfolderurl, netrcfile)
-
-	items = []
-	uris.each do |uri|
-		items << Podcast.construct_item_from_uri(uri)
-	end
-
-	return items
-end
-
-def index_remote_directory(hostname, remotepath, httpfolderurl, netrcfile = nil)
-	username, password = Netrc.read(netrcfile)[hostname]
-	filepaths = []
-	Net::SFTP.start(hostname, username, :password => password) do |sftp|
-		sftp.dir.entries(remotepath).each do |file|
-			filepaths << File.join(remotepath, file.name) unless file.directory?
-		end
-	end
-
-	uris = build_uris_for_files(filepaths, httpfolderurl, netrcfile)
-
-	items = []
-	uris.each do |uri|
-		items << Podcast.construct_item_from_uri(uri)
-	end
-
-	return items
-end
-
-def build_uris_for_files(filepaths, httpfolderurl, netrcfile = nil)
-    httpfolderurl += "/" unless httpfolderurl[-1] == "/"
-	folderURI = parse_url(httpfolderurl, netrcfile)
-	uris	= []
-	filepaths.each do |filepath|
-		escaped = URI.escape(File.basename(filepath))
-		uris << URI.join(folderURI, escaped)
-	end
-	return uris
-end
-
-def parse_media_list(media_list_path)
-	items = []
-	lines = open(media_list_path).read.split("\n").map(&:strip)
-	lines.each do |line|
-		split = line.split("||")
-		type = split.slice!(0)
-		path = split.slice!(-1)
-		arguments = split
-		items << [type.downcase, arguments, path]
-	end
-	return items
-end
-
-#an example use case for this is in aggregator.rb in the example_scripts folder
-def handle_media_list(media_list_path, media_folder, media_folder_url,
-								server_settings, netrc_file_path)
-	items = []
-	parse_media_list(media_list_path).each do |type, arguments, path|
-		case type
-		when "fileurl"
-			uri = parse_url(path)
-			items << Podcast.construct_item_from_uri(uri)
-
-		when "youtubeplaylistsubscription"
-			format, url = arguments[0], path
-			sync_youtube_playlist(url, media_folder, format)
-
-		when "youtubedl"
-			format, url = arguments[0], path
-			download_youtube_video(url, media_folder, format)
-
-		when "remoteserver"
-			settings = server_settings[arguments[0].downcase]
-			folder_url = [settings[1], path].join("/")
-			hostname = settings[0]
-			items += index_remote_directory(hostname, path,
-								folder_url, netrc_file_path)
-		else
-			puts "No handler for #{type}"
-		end
-	end
-
-	items += index_local_directory(media_folder, media_folder_url,
-												netrc_file_path)
-	return items
-end
 
 def md5(string)
 	return Digest::MD5.new.update(string).hexdigest

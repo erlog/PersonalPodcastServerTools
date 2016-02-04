@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require_relative 'podcastgeneratorlib'
+require_relative 'aggregator.rb'
 
 #For if you want a username/password inlined into the podcast URL's
 NetRCFilePath = "/etc/apache2/.netrc"
