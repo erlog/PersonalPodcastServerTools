@@ -1,16 +1,12 @@
 require 'time'
-require 'shellwords'
 require 'uri'
-require 'cgi'
 require 'net/http'
-require 'net/sftp'
 require 'openssl'
 require 'netrc'
 require 'digest'
 require 'tmpdir'
 require 'rexml/document'
 require 'rss'
-require 'fileutils'
 
 #Initialize cache
 CachePath = File.join(Dir.tmpdir, "podcastgenerator-#{ENV["USER"]}")

@@ -1,4 +1,5 @@
 require_relative 'podcastgeneratorlib'
+require 'net/sftp'
 
 def handle_media_list(media_list_path, media_folder, media_folder_url,
 								server_settings, netrc_file_path)
