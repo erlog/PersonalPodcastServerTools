@@ -1,5 +1,6 @@
 require_relative 'podcastgeneratorlib'
 require 'net/sftp'
+require 'netrc'
 
 def handle_media_list(media_list_path, media_folder, media_folder_url,
 								server_settings, netrc_file_path)
@@ -72,7 +73,7 @@ end
 
 def parse_url(url, netrcfile = nil)
 	uri = URI(URI.escape(url))
-	if netrcfile
+	if File.exists?(netrcfile)
 		credentials = Netrc.read(netrcfile)[uri.host]
 		uri.user = URI.escape(credentials[0])
 		uri.password = URI.escape(credentials[1])
