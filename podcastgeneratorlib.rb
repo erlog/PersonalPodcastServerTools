@@ -1,11 +1,11 @@
 require 'time'
-require 'uri'
 require 'net/http'
 require 'openssl'
 require 'digest'
 require 'tmpdir'
 require 'rexml/document'
 require 'rss'
+require 'addressable/uri'
 
 #Initialize cache
 CachePath = File.join(Dir.tmpdir, "podcastgenerator-#{ENV["USER"]}")
@@ -62,6 +62,7 @@ class Podcast
 			return parseditem unless !parseditem
 		end
 
+        uri.port = uri.inferred_port unless uri.port
 		http = Net::HTTP.new(uri.host, uri.port)
 		if uri.scheme == "https"
 			http.use_ssl = true
@@ -70,13 +71,14 @@ class Podcast
 
 		request = Net::HTTP::Head.new(uri.request_uri)
 		if uri.userinfo
-			request.basic_auth(URI.unescape(uri.user), URI.unescape(uri.password))
+			request.basic_auth(Addressable::URI.unencode(uri.user),
+                                Addressable::URI.unencode(uri.password))
 		end
 
 		response = http.request(request)
 
 		if response.code == "200"
-			title = URI.unescape(File.basename(uri.path))
+			title = Addressable::URI.unencode(File.basename(uri.path))
 			pubdate = response["last-modified"]
 			filesize = response["content-length"]
 			mimetype = response["content-type"]
@@ -92,7 +94,7 @@ class Podcast
 	def self.construct_item_from_xml(xmlstring)
         item = REXML::XPath.match(REXML::Document.new(xmlstring), "//item")[0]
         title = item.elements["title"].text
-        url = URI(item.elements["link"].text)
+        url = Addressable::URI(item.elements["link"].text)
         pubdate = item.elements["pubDate"].text
         filesize = item.elements["enclosure"].attributes["length"]
         mimetype = item.elements["enclosure"].attributes["type"]

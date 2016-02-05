@@ -1,4 +1,5 @@
 require_relative 'podcastgeneratorlib'
+require 'cgi'
 require 'net/sftp'
 require 'netrc'
 
@@ -11,7 +12,7 @@ def handle_media_list(media_list_path, media_folder, media_folder_url,
 			uri = parse_url(path)
 			items << Podcast.construct_item_from_uri(uri)
 
-		when "youtubeplaylistsubscription"
+		when "xyoutubeplaylistsubscription"
 			format, url = arguments[0], path
 			sync_youtube_playlist(url, media_folder, format)
 
@@ -71,15 +72,6 @@ def download_youtube_video(url, downloadfolderpath, formatcode)
 	return system(command)
 end
 
-def parse_url(url, netrcfile = nil)
-	uri = URI(URI.escape(url))
-	if File.exists?(netrcfile)
-		credentials = Netrc.read(netrcfile)[uri.host]
-		uri.user = URI.escape(credentials[0])
-		uri.password = URI.escape(credentials[1])
-	end
-	return uri
-end
 
 def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
 	filepaths = []
@@ -112,7 +104,9 @@ def build_items_for_files(filepaths, httpfolderurl, netrcfile = nil)
 
 	uris	= []
 	filepaths.each do |filepath|
-		uris << URI.join(folderURI, URI.escape(File.basename(filepath)))
+        filepath = "/" + filepath unless filepath[0] == "/"
+        escaped = escape_for_url(File.basename(filepath))
+		uris << Addressable::URI.join(folderURI, escaped)
 	end
 
 	items = []
@@ -121,4 +115,25 @@ def build_items_for_files(filepaths, httpfolderurl, netrcfile = nil)
 	end
 
 	return items
+end
+
+def parse_url(url, netrcfile = nil)
+	uri = Addressable::URI.parse(url)
+
+	if netrcfile and File.exists?(netrcfile)
+		credentials = Netrc.read(netrcfile)[uri.host]
+		uri.user = escape_for_url(credentials[0])
+		uri.password = escape_for_url(credentials[1])
+	end
+	return uri
+end
+
+def escape_url(url)
+    url = Addressable::URI.encode(url.to_s)
+    return url
+end
+
+def escape_for_url(string)
+    string = Addressable::URI.encode(string)
+    return string
 end
