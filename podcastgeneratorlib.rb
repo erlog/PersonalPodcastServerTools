@@ -59,7 +59,11 @@ class Podcast
                 parseditem = nil
             end
 
-			return parseditem unless !parseditem
+            if parseditem != nil
+                puts "Using cached for: #{uri}"
+                return parseditem
+            end
+
 		end
 
         uri.port = uri.inferred_port unless uri.port

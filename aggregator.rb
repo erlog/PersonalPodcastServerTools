@@ -3,10 +3,27 @@ require 'cgi'
 require 'net/sftp'
 require 'netrc'
 
-def handle_media_list(media_list_path, media_folder, media_folder_url,
-								server_settings, netrc_file_path)
+def handle_media_list(media_list_path)
+    parsed_lines = parse_media_list(media_list_path)
+
+    #grab settings
+    settings = {}
+    server_settings = {}
+    parsed_lines.each do |type, arguments, setting|
+        case type
+        when "setting"
+            settings[arguments[0].downcase] = setting
+        when "remoteserversetting"
+            server_settings[arguments[0].downcase] = [arguments[1], setting]
+        end
+    end
+
+    podcast = Podcast.new( settings["rssfileurl"],
+                            settings["title"],
+                            settings["description"] )
+
 	items = []
-	parse_media_list(media_list_path).each do |type, arguments, path|
+	parsed_lines.each do |type, arguments, path|
 		case type
 		when "fileurl"
 			uri = parse_url(path)
@@ -14,26 +31,34 @@ def handle_media_list(media_list_path, media_folder, media_folder_url,
 
 		when "youtubeplaylistsubscription"
 			format, url = arguments[0], path
-			sync_youtube_playlist(url, media_folder, format)
+			sync_youtube_playlist(url, settings["mediafolder"], format)
 
 		when "youtubedl"
 			format, url = arguments[0], path
-			download_youtube_video(url, media_folder, format)
+			download_youtube_video(url, settings["mediafolder"], format)
 
 		when "remoteserver"
-			settings = server_settings[arguments[0].downcase]
-			folder_url = [settings[1], path].join("/")
-			hostname = settings[0]
+			server_setting = server_settings[arguments[0].downcase]
+			folder_url = [server_setting[1], path].join("/")
+			hostname = server_setting[0]
 			items += index_remote_directory(hostname, path,
-								folder_url, netrc_file_path)
+								folder_url, settings["netrcfilepath"])
+        when "setting"
+            next
+        when "remoteserversetting"
+            next
 		else
 			puts "No handler for #{type}"
 		end
 	end
 
-	items += index_local_directory(media_folder, media_folder_url,
-												netrc_file_path)
-	return items
+	items += index_local_directory( settings["mediafolder"],
+                                    settings["mediafolderurl"],
+                                    settings["netrcfilepath"] )
+
+
+    podcast.items = items
+    podcast.write(settings["rssfilepath"])
 end
 
 def parse_media_list(media_list_path)
@@ -41,6 +66,7 @@ def parse_media_list(media_list_path)
 
 	items = []
 	lines.each do |line|
+        next if (line[0] == "#" or line.empty?)
 		arguments = line.split("||")
 		type, path = arguments.slice!(0), arguments.slice!(-1)
 		items << [type.downcase, arguments, path]
