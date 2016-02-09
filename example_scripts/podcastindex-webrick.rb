@@ -5,7 +5,7 @@ require_relative '../aggregator.rb'
 DocumentRoot = File.expand_path("~/files")
 NetRCFilePath = File.expand_path("~/.netrc")
 ServerURL = ARGV[0]
-ListenPort = 37196
+ListenPort = ARGV[1].to_i
 
 class PodcastIndex < WEBrick::HTTPServlet::AbstractServlet
   def do_GET(request, response)
