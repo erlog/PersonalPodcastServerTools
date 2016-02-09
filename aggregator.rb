@@ -12,7 +12,7 @@ def handle_media_list(media_list_path, media_folder, media_folder_url,
 			uri = parse_url(path)
 			items << Podcast.construct_item_from_uri(uri)
 
-		when "xyoutubeplaylistsubscription"
+		when "youtubeplaylistsubscription"
 			format, url = arguments[0], path
 			sync_youtube_playlist(url, media_folder, format)
 
