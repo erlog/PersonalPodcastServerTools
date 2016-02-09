@@ -137,3 +137,12 @@ def escape_for_url(string)
     string = Addressable::URI.encode(string)
     return string
 end
+
+def join_url(url_a, url_b)
+    combined_uri = Addressable::URI.parse([url_a, url_b].join("/"))
+    while combined_uri.path.match("//")
+        combined_uri.path = combined_uri.path.sub("//", "/")
+    end
+
+    return combined_uri.to_s
+end
