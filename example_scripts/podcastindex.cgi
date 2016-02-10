@@ -1,7 +1,9 @@
 #!/usr/bin/env ruby
-open("output", "w").write(`env`)
 require 'rubygems'
 require_relative '../aggregator.rb'
+
+#redirect stdout
+$stdout = StringIO.new
 
 #For if you want a username/password inlined into the podcast URL's
 NetRCFilePath = "/etc/apache2/.netrc"
@@ -22,6 +24,9 @@ local_path = File.join(ENV["DOCUMENT_ROOT"], ENV["REQUEST_URI"])
 podcast = Podcast.new(rss_uri, title, description)
 podcast.items = index_local_directory(local_path, rss_uri.to_s, NetRCFilePath)
 podcast.items.sort_by!(&:pubDate).reverse!
+
+#redirect stdout back to original
+$stdout = STDOUT
 
 puts "Content-type: application/xml\n\n"
 puts podcast.to_s
