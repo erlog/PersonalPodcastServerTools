@@ -132,7 +132,6 @@ def build_items_for_files(filepaths, httpfolderurl, netrcfile = nil)
 
 	uris	= []
 	filepaths.each do |filepath|
-        puts "Building item for #{filepath}"
         filepath = "/" + filepath unless filepath[0] == "/"
         escaped = escape_for_url(File.basename(filepath))
 		uris << Addressable::URI.join(folderURI, escaped)

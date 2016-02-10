@@ -8,6 +8,7 @@ require 'rss'
 require 'addressable/uri'
 
 #Initialize cache
+ENV["USER"] = `whoami` unless ENV["USER"]
 CachePath = File.join(Dir.tmpdir, "podcastgenerator-#{ENV["USER"]}")
 Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
 
@@ -51,6 +52,8 @@ class Podcast
 	end
 
 	def self.construct_item_from_uri(uri)
+        uri.port = uri.inferred_port unless uri.port
+
 		cached = load_from_cache(uri.to_s)
 		if cached
             parseditem = construct_item_from_xml(cached)
@@ -62,7 +65,6 @@ class Podcast
 
 		end
 
-        uri.port = uri.inferred_port unless uri.port
 		http = Net::HTTP.new(uri.host, uri.port)
 		if uri.scheme == "https"
 			http.use_ssl = true
@@ -83,6 +85,7 @@ class Podcast
 			filesize = response["content-length"]
 			mimetype = response["content-type"]
             item = new_item(title, uri, pubdate, filesize, mimetype)
+            puts "Saving cache for: #{uri.path}"
 			save_to_cache(uri.to_s, item)
 		else
             item = new_item(response.code, uri, DateTime.now.httpdate , 0, "")
@@ -115,6 +118,10 @@ end
 
 def load_from_cache(string)
 	file = File.join(CachePath, md5(string))
-	return open(file).read().strip() if File.exists?(file)
-	return nil
+
+    if File.exists?(file)
+        return open(file).read().strip()
+    else
+        return nil
+    end
 end
