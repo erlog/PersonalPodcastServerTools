@@ -53,14 +53,10 @@ class Podcast
 	def self.construct_item_from_uri(uri)
 		cached = load_from_cache(uri.to_s)
 		if cached
-            begin
-                parseditem = construct_item_from_xml(cached)
-            rescue
-                parseditem = nil
-            end
+            parseditem = construct_item_from_xml(cached)
 
             if parseditem != nil
-                puts "Using cached for: #{uri}"
+                puts "Using cached for: #{uri.path}"
                 return parseditem
             end
 
@@ -98,7 +94,7 @@ class Podcast
 	def self.construct_item_from_xml(xmlstring)
         item = REXML::XPath.match(REXML::Document.new(xmlstring), "//item")[0]
         title = item.elements["title"].text
-        url = Addressable::URI(item.elements["link"].text)
+        url = Addressable::URI.parse(item.elements["link"].text)
         pubdate = item.elements["pubDate"].text
         filesize = item.elements["enclosure"].attributes["length"]
         mimetype = item.elements["enclosure"].attributes["type"]

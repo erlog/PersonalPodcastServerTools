@@ -18,10 +18,7 @@ def handle_media_list(media_list_path)
         end
     end
 
-    podcast = Podcast.new( settings["rssfileurl"],
-                            settings["title"],
-                            settings["description"] )
-
+    #sync YouTube and build items
 	items = []
 	parsed_lines.each do |type, arguments, path|
 		case type
@@ -52,10 +49,14 @@ def handle_media_list(media_list_path)
 		end
 	end
 
+    #add all the downloaded YouTube videos, etc. to the podcast feed
 	items += index_local_directory( settings["mediafolder"],
                                     settings["mediafolderurl"],
                                     settings["netrcfilepath"] )
 
+    podcast = Podcast.new( settings["rssfileurl"],
+                            settings["title"],
+                            settings["description"] )
 
     podcast.items = items
     podcast.write(settings["rssfilepath"])
@@ -100,6 +101,7 @@ end
 
 
 def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
+    puts "Indexing #{localpath}"
 	filepaths = []
 
 	Dir::entries(localpath).each do |entry|
@@ -130,6 +132,7 @@ def build_items_for_files(filepaths, httpfolderurl, netrcfile = nil)
 
 	uris	= []
 	filepaths.each do |filepath|
+        puts "Building item for #{filepath}"
         filepath = "/" + filepath unless filepath[0] == "/"
         escaped = escape_for_url(File.basename(filepath))
 		uris << Addressable::URI.join(folderURI, escaped)
