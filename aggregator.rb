@@ -121,7 +121,7 @@ end
 
 def index_remote_directory(http_folder_url, netrcfile = nil)
     folder_uri = parse_url(http_folder_url, netrcfile)
-    uris = list_downloadable_uris(folder_uri)
+    uris = list_downloadable_uris(folder_uri, netrcfile)
 
 	items = []
 	uris.each do |uri|

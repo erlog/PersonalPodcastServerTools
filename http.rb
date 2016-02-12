@@ -12,27 +12,41 @@ ENV["USER"] = `whoami` unless ENV["USER"]
 CachePath = File.join(Dir.tmpdir, "podcastgenerator-#{ENV["USER"]}")
 Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
 
-def list_downloadable_uris(page_uri)
-    #To-do: make this cache properly
+def list_downloadable_uris(page_uri, netrcfile = nil)
     html = request_http_response(page_uri).body
 
     uris = []
     Nokogiri::HTML(html).css("a").each do |link|
-        file_uri = parse_url(link["href"])
+        file_uri = parse_url(link["href"], netrcfile)
+
+        #skip if the link is empty
         next if !file_uri
 
         #check for relative URL
-        file_uri = parse_url(join_url(page_uri, file_uri)) unless file_uri.host
-        #make sure it's not an html file
-        header = request_http_header(file_uri)
+        file_uri = parse_url(join_url(page_uri, file_uri), netrcfile) unless file_uri.host
 
-        uris << file_uri unless header["content-type"][0..3] == "text"
+        if cache_exists?(file_uri.to_s)
+            puts "Not checking header, cache exists for: #{file_uri.path}"
+            uris << file_uri
+        else
+            #make sure it's not an html file or text file
+            header = request_http_header(file_uri)
+            uris << file_uri unless header["content-type"][0..3] == "text"
+        end
     end
 
     return uris
 end
 
 def request_http_response(uri)
+		return http_request(uri, Net::HTTP::Get)
+end
+
+def request_http_header(uri)
+		return http_request(uri, Net::HTTP::Head)
+end
+
+def http_request(uri, method)
         #To-do, make these fault tolerant and follow 301's, etc.
 		http = Net::HTTP.new(uri.host, uri.port)
 
@@ -41,28 +55,13 @@ def request_http_response(uri)
 			http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 		end
 
-		request = Net::HTTP::Get.new(uri.request_uri)
+		request = method.new(uri.request_uri)
 		if uri.userinfo
 			request.basic_auth(Addressable::URI.unencode(uri.user),
                                 Addressable::URI.unencode(uri.password))
 		end
 
-		return http.request(request)
-end
-
-def request_http_header(uri)
-		http = Net::HTTP.new(uri.host, uri.port)
-		if uri.scheme == "https"
-			http.use_ssl = true
-			http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-		end
-
-		request = Net::HTTP::Head.new(uri.request_uri)
-		if uri.userinfo
-			request.basic_auth(Addressable::URI.unencode(uri.user),
-                                Addressable::URI.unencode(uri.password))
-		end
-
+        response = http.request(request)
 		return http.request(request)
 end
 
@@ -111,9 +110,12 @@ end
 def load_from_cache(string)
 	file = File.join(CachePath, md5(string))
 
-    if File.exists?(file)
-        return open(file).read().strip()
-    else
-        return nil
-    end
+    return open(file).read().strip() if File.exists?(file)
+
+    return nil
+end
+
+def cache_exists?(string)
+	file = File.join(CachePath, md5(string))
+    return File.exists?(file)
 end
