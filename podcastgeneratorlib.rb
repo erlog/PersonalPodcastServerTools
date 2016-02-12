@@ -1,16 +1,8 @@
+require_relative 'http.rb'
 require 'time'
-require 'net/http'
-require 'openssl'
 require 'digest'
-require 'tmpdir'
 require 'rexml/document'
 require 'rss'
-require 'addressable/uri'
-
-#Initialize cache
-ENV["USER"] = `whoami` unless ENV["USER"]
-CachePath = File.join(Dir.tmpdir, "podcastgenerator-#{ENV["USER"]}")
-Dir.mkdir(CachePath) unless Dir.exist?(CachePath)
 
 class Podcast
 	def initialize(rss_url, title, description)
@@ -52,8 +44,6 @@ class Podcast
 	end
 
 	def self.construct_item_from_uri(uri)
-        uri.port = uri.inferred_port unless uri.port
-
 		cached = load_from_cache(uri.to_s)
 		if cached
             parseditem = construct_item_from_xml(cached)
@@ -62,25 +52,12 @@ class Podcast
                 puts "Using cached for: #{uri.path}"
                 return parseditem
             end
-
 		end
 
-		http = Net::HTTP.new(uri.host, uri.port)
-		if uri.scheme == "https"
-			http.use_ssl = true
-			http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-		end
-
-		request = Net::HTTP::Head.new(uri.request_uri)
-		if uri.userinfo
-			request.basic_auth(Addressable::URI.unencode(uri.user),
-                                Addressable::URI.unencode(uri.password))
-		end
-
-		response = http.request(request)
+        response = request_http_header(uri)
 
 		if response.code == "200"
-			title = Addressable::URI.unencode(File.basename(uri.path))
+			title = unencode_url(File.basename(uri.path))
 			pubdate = response["last-modified"]
 			filesize = response["content-length"]
 			mimetype = response["content-type"]
@@ -97,7 +74,7 @@ class Podcast
 	def self.construct_item_from_xml(xmlstring)
         item = REXML::XPath.match(REXML::Document.new(xmlstring), "//item")[0]
         title = item.elements["title"].text
-        url = Addressable::URI.parse(item.elements["link"].text)
+        url = item.elements["link"].text
         pubdate = item.elements["pubDate"].text
         filesize = item.elements["enclosure"].attributes["length"]
         mimetype = item.elements["enclosure"].attributes["type"]
@@ -106,22 +83,3 @@ class Podcast
 end
 
 
-def md5(string)
-	return Digest::MD5.new.update(string).hexdigest
-end
-
-def save_to_cache(string, data)
-	file = open(File.join(CachePath, md5(string)), "w")
-	file.write(data)
-	file.close()
-end
-
-def load_from_cache(string)
-	file = File.join(CachePath, md5(string))
-
-    if File.exists?(file)
-        return open(file).read().strip()
-    else
-        return nil
-    end
-end

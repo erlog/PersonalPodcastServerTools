@@ -1,21 +1,12 @@
 require_relative 'podcastgeneratorlib'
-require 'cgi'
-require 'net/sftp'
-require 'netrc'
 
 def handle_media_list(media_list_path)
     parsed_lines = parse_media_list(media_list_path)
 
     #grab settings
     settings = {}
-    server_settings = {}
     parsed_lines.each do |type, arguments, setting|
-        case type
-        when "setting"
-            settings[arguments[0].downcase] = setting
-        when "remoteserversetting"
-            server_settings[arguments[0].downcase] = [arguments[1], setting]
-        end
+        settings[arguments[0].downcase] = setting unless type != "setting"
     end
 
     #sync YouTube and build items
@@ -34,16 +25,12 @@ def handle_media_list(media_list_path)
 			format, url = arguments[0], path
 			download_youtube_video(url, settings["mediafolder"], format)
 
-		when "remoteserver"
-			server_setting = server_settings[arguments[0].downcase]
-			folder_url = [server_setting[1], path].join("/")
-			hostname = server_setting[0]
-			items += index_remote_directory(hostname, path,
-								folder_url, settings["netrcfilepath"])
+		when "remotedirectory"
+			items += index_remote_directory(path, settings["netrcfilepath"])
+
         when "setting"
             next
-        when "remoteserversetting"
-            next
+
 		else
 			puts "No handler for #{type}"
 		end
@@ -114,27 +101,14 @@ def index_local_directory(localpath, httpfolderurl, netrcfile = nil)
 	return build_items_for_files(filepaths, httpfolderurl, netrcfile)
 end
 
-def index_remote_directory(hostname, remotepath, httpfolderurl, netrcfile = nil)
-	username, password = Netrc.read(netrcfile)[hostname]
-	filepaths = []
-	Net::SFTP.start(hostname, username, :password => password) do |sftp|
-		sftp.dir.entries(remotepath).each do |file|
-			filepaths << File.join(remotepath, file.name) unless file.directory?
-		end
-	end
-
-	return build_items_for_files(filepaths, httpfolderurl, netrcfile)
-end
-
 def build_items_for_files(filepaths, httpfolderurl, netrcfile = nil)
     httpfolderurl += "/" unless httpfolderurl[-1] == "/"
 	folderURI = parse_url(httpfolderurl, netrcfile)
 
-	uris	= []
+	uris = []
 	filepaths.each do |filepath|
         filepath = "/" + filepath unless filepath[0] == "/"
-        escaped = escape_for_url(File.basename(filepath))
-		uris << Addressable::URI.join(folderURI, escaped)
+		uris << parse_url(join_url(folderURI, File.basename(filepath)))
 	end
 
 	items = []
@@ -145,34 +119,16 @@ def build_items_for_files(filepaths, httpfolderurl, netrcfile = nil)
 	return items
 end
 
-def parse_url(url, netrcfile = nil)
-	uri = Addressable::URI.parse(url)
+def index_remote_directory(http_folder_url, netrcfile = nil)
+    folder_uri = parse_url(http_folder_url, netrcfile)
+    uris = list_downloadable_uris(folder_uri)
 
-	if netrcfile and File.exists?(netrcfile)
-		credentials = Netrc.read(netrcfile)[uri.host]
-		uri.user = escape_for_url(credentials[0])
-		uri.password = escape_for_url(credentials[1])
+	items = []
+	uris.each do |uri|
+		items << Podcast.construct_item_from_uri(uri)
 	end
-	return uri
-end
 
-def escape_url(url)
-    url = Addressable::URI.encode(url.to_s)
-    return url
-end
-
-def escape_for_url(string)
-    string = Addressable::URI.encode(string)
-    return string
-end
-
-def join_url(url_a, url_b)
-    combined_uri = Addressable::URI.parse([url_a, url_b].join("/"))
-    while combined_uri.path.match("//")
-        combined_uri.path = combined_uri.path.sub("//", "/")
-    end
-
-    return combined_uri.to_s
+	return items
 end
 
 if __FILE__ == $0

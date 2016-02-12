@@ -1,4 +1,5 @@
 #!/bin/sh
+#example script to be used with a cron job
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 date > ~/log/podcast 2>&1
 ruby "/install/path/aggregator.rb" "/path/to/medialist.txt" >> ~/log/podcast 2>&1

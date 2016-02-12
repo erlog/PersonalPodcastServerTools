@@ -12,12 +12,11 @@ Setting||RSSFileURL||https://mediaserver.tld/podcast/podcast.xml
 Setting||Title||Media server podcast feed.
 Setting||Description||Media list content.
 
-#Setting and credentials to use for remote servers, if applicable
+#Credentials to use for HTTP Basic Auth, if applicable
 Setting||NetRCFilePath||/home/username/.netrc
-RemoteServerSetting||MyRemote||myremote.tld||https://myremote.tld/files
 
 #Media List#
 FileURL||http://www.supremecourt.gov/media/audio/mp3files/14-8913.mp3
 YouTubePlaylistSubscription||https://www.youtube.com/playlist?list=PLdFBN0Nedy2yMBKgkglb1AE_GWdKBNZUn
-RemoteServer||MyRemote||/Public.Domain.Video.Content.Folder/
+RemoteDirectory||https://myremote.tld/Public.Domain.Video.Content.Folder/
 YouTubeDL||36||https://www.youtube.com/watch?v=PaKIZ7gJlRU
