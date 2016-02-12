@@ -1,6 +1,5 @@
 require_relative 'http.rb'
 require 'time'
-require 'digest'
 require 'rexml/document'
 require 'rss'
 

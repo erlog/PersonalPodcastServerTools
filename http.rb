@@ -1,9 +1,10 @@
-require 'net/http'
-require 'openssl'
-require 'addressable/uri'
 require 'tmpdir'
 require 'netrc'
+require 'addressable/uri'
+require 'net/http'
+require 'openssl'
 require 'nokogiri'
+require 'digest'
 
 #cron doesn't fill this value by default
 ENV["USER"] = `whoami` unless ENV["USER"]
@@ -18,9 +19,7 @@ def list_downloadable_uris(page_uri, netrcfile = nil)
     uris = []
     Nokogiri::HTML(html).css("a").each do |link|
         file_uri = parse_url(link["href"], netrcfile)
-
-        #skip if the link is empty
-        next if !file_uri
+        next if !file_uri #skip if the link is empty
 
         #check for relative URL
         file_uri = parse_url(join_url(page_uri, file_uri), netrcfile) unless file_uri.host
@@ -77,11 +76,14 @@ end
 def parse_url(url, netrcfile = nil)
     url = unencode_url(url)
     uri = Addressable::URI.parse(url)
+    return nil unless uri
 
     if netrcfile and File.exists?(netrcfile)
         credentials = Netrc.read(netrcfile)[uri.host]
-        uri.user = credentials[0]
-        uri.password = credentials[1]
+        if credentials
+            uri.user = credentials[0]
+            uri.password = credentials[1]
+        end
     end
 
     uri.port = uri.inferred_port unless uri.port
