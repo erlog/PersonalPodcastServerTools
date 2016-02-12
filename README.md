@@ -11,9 +11,9 @@ File an issue if you have a feature request, but do know that priority will be g
 
 ## Features
  * Sync YouTube channels to a personal podcast feed to watch offline to avoid using up mobile data with streaming.
- * Download anything [YouTube-DL](https://github.com/rg3/youtube-dl) has support for via URL.
- * Easy access to existing media files by replacing regular directory indexes with per-folder podcast feed indexes.
- * Aggregation of remote server folders without mirroring content on the local server through a mix of SFTP and HTTP calls.
+ * Aggreggate anything [YouTube-DL](https://github.com/rg3/youtube-dl) has support for via URL.
+ * Aggregation of remote server folders via scraping directory index pages.
+ * Aggregation of non-podcast content via scraping web pages for downloadable links.
  * Aggregation of remote URL's to your personal podcast feed without mirroring content on the local server.
  * Credential caching via .netrc
  * Content metadata caching to avoid spamming remote servers with requests.
@@ -26,9 +26,8 @@ This project's goal is to allow access to media files on a server with less hass
 ## Dependencies
  * [Ruby 2.1.5+](https://www.ruby-lang.org/)
  * [netrc Ruby gem](https://rubygems.org/gems/netrc/)
- * [net-sftp Ruby gem](https://rubygems.org/gems/net-sftp/)
+ * [nokogiri Ruby gem](https://rubygems.org/gems/nokogiri/)
  * [YouTube-DL](https://github.com/rg3/youtube-dl)
- * Any web server that can serve files. 
- * The directory index script requires CGI to be configured on the web server.
+ * Any web server that can serve files.
 
 
