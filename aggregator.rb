@@ -174,3 +174,9 @@ def join_url(url_a, url_b)
 
     return combined_uri.to_s
 end
+
+if __FILE__ == $0
+    ARGV.each do |path|
+        handle_media_list(path)
+    end
+end
