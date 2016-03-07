@@ -2,6 +2,7 @@ require_relative 'http.rb'
 require 'time'
 require 'rexml/document'
 require 'rss'
+require 'mime/types'
 
 class Podcast
 	def initialize(rss_url, title, description)
@@ -59,7 +60,14 @@ class Podcast
 			title = unencode_url(File.basename(uri.path))
 			pubdate = response["last-modified"]
 			filesize = response["content-length"]
-			mimetype = response["content-type"]
+
+			mimetype = MIME::Types.type_for(title)[0]
+            if mimetype
+                mimetype = mimetype.content_type
+            else
+                mimetype = response["content-type"] unless mimetype
+            end
+
             item = new_item(title, uri, pubdate, filesize, mimetype)
             puts "Saving cache for: #{uri.path}"
 			save_to_cache(uri.to_s, item)
