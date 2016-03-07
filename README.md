@@ -28,6 +28,7 @@ This project's goal is to allow access to media files on a server with less hass
  * [netrc Ruby gem](https://rubygems.org/gems/netrc/)
  * [nokogiri Ruby gem](https://rubygems.org/gems/nokogiri/)
  * [addressable Ruby gem](https://rubygems.org/gems/addressable/)
+ * [mime-types Ruby gem](https://rubygems.org/gems/mime-types/)
  * [YouTube-DL](https://github.com/rg3/youtube-dl)
  * Any web server that can serve files.
 
