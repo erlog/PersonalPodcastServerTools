@@ -7,7 +7,7 @@ require 'nokogiri'
 require 'digest'
 
 #cron doesn't fill this value by default
-ENV["USER"] = `whoami` unless ENV["USER"]
+ENV["USER"] = `whoami`.strip unless ENV["USER"]
 
 #Initialize cache
 CachePath = File.join(Dir.tmpdir, "podcastgenerator-#{ENV["USER"]}")
